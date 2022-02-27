@@ -1,0 +1,84 @@
+﻿@page "/getproductsbycategoryıd"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+<EditForm Model="@products" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    <p>
+        <label for="CategoryId">Kategori Id:</label>
+        <InputNumber id="CategoryId" @bind-Value="categoryId" required />
+        @*<ValidationMessage For="() => category.CategoryName" />*@
+        <button type="submit">Ürünleri Listele</button>
+    </p>
+    @if (products is not null)
+    {
+        <table class="table">
+            <tr>
+                <th>S/N</th>
+                <th>Ürün Adı</th>
+                <th>Kategori</th>
+                <th>Marka</th>
+                <th>Renk</th>
+                <th>Tanımı</th>
+                <th>Kullanım Durumu</th>
+                <th>Fiyat</th>
+                <th>Fotoğraf</th>
+            </tr>
+            <hr />
+            @foreach (var product in products)
+            {
+        <tr>
+            <th>@counter</th>
+            <th>@product.ProductName</th>
+            <th>@product.Category</th>
+            <th>@product.Brand</th>
+            <th>@product.Color</th>
+            <th>@product.Description</th>
+            <th>@product.UseState</th>
+            <th>@product.Price</th>
+            <th><img src="/Images/ProductImages/@product.ImagePath" style="max-height :200px"/></th>
+        </tr>
+                counter++;
+            }
+        </table>
+    }
+    <h3>@result</h3>
+</EditForm>
+
+@code {
+
+    protected List<ProductsViewModel> products = new List<ProductsViewModel>();
+    public int categoryId;
+    public string result;
+    private int counter = 1;
+    private async Task Submit()
+    {
+        counter = 1;
+        result = "";
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Category/" + categoryId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            products = await response.Content.ReadFromJsonAsync<List<ProductsViewModel>>();
+        }
+        else
+        {
+            products.Clear();
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+}

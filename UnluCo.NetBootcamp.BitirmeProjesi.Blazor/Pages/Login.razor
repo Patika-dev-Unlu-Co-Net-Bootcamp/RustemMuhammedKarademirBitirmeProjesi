@@ -1,0 +1,55 @@
+﻿@page "/login"
+@inject IHttpClientFactory ClientFactory
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@inject ProtectedLocalStorage Storage
+<h3>Giriş</h3>
+
+<EditForm Model="@User" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    @*<ValidationSummary />*@
+    <p>
+        <label for="Email">Email</label>
+        <InputText id="Email" @bind-Value="User.Email" />
+        <ValidationMessage For="() => User.Email" />
+    </p>
+    <p>
+        <label for="Password">Şifre</label>
+        <InputText id="Password" @bind-Value="User.Password" />
+        <ValidationMessage For="() => User.Password" />
+    </p>
+
+    <button type="submit">Giriş</button>
+
+    <h3>@result</h3>
+</EditForm>
+
+
+@code {
+
+    public UserForLoginModel User = new();
+    public string result;
+    public static int userId;
+    private async Task Submit()
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var response = await client.PostAsJsonAsync("https://localhost:44301/api/Auth/login", User);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var token = await response.Content.ReadFromJsonAsync<AccessToken>();
+            result = "Merhaba, " + token.UserFirstName + " " + token.UserLastName;
+            userId = token.UserId;
+            await Storage.SetAsync("token", token.Token);
+        }
+
+        else
+        {
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+}

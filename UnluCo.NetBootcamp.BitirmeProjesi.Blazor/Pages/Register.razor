@@ -1,0 +1,52 @@
+﻿@page "/register"
+@inject IHttpClientFactory ClientFactory
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@inject ProtectedLocalStorage Storage
+<h3>Kayıt</h3>
+
+<EditForm Model="@User" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    @*<ValidationSummary />*@
+    <p>
+        <label for="FirstName">Ad</label>
+        <InputText id="FirstName" @bind-Value="User.FirstName" />
+        <ValidationMessage For="() => User.FirstName" />
+    </p>
+    <p>
+        <label for="LastName">Soyad</label>
+        <InputText id="LastName" @bind-Value="User.LastName" />
+        <ValidationMessage For="() => User.LastName" />
+    </p>
+    <p>
+        <label for="Email">Email</label>
+        <InputText id="Email" @bind-Value="User.Email" />
+        <ValidationMessage For="() => User.Email" />
+    </p>
+    <p>
+        <label for="Password">Şifre</label>
+        <InputText id="Password" @bind-Value="User.Password" />
+        <ValidationMessage For="() => User.Password" />
+    </p>
+
+    <button type="submit">Kayıt ol</button>
+
+    <h3>@result</h3>
+</EditForm>
+
+
+@code {
+
+    public UserForRegisterModel User = new();
+    public string result;
+    private async Task Submit()
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var response = await client.PostAsJsonAsync("https://localhost:44301/api/Auth/register", User);
+        var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+}

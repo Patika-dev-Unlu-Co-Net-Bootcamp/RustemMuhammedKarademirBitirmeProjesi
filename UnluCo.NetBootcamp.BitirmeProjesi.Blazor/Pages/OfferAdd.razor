@@ -1,0 +1,163 @@
+﻿@page "/offeradd"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+<EditForm Model="@offer" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    @if (products is not null)
+    {
+        counter = 0;
+        <table class="table">
+            <tr>
+                <th>S/N</th>
+                <th>Ürün Adı</th>
+                <th>Kategori</th>
+                <th>Marka</th>
+                <th>Renk</th>
+                <th>Açıklama</th>
+                <th>Kullanım Durumu</th>
+                <th>Fiyat</th>
+                <th>Fotoğraf</th>
+            </tr>
+            @foreach (var product in products)
+            {
+                counter++;
+                <tr>
+                    <th>@counter</th>
+                    <th>@product.ProductName</th>
+                    <th>@product.Category</th>
+                    <th>@product.Brand</th>
+                    <th>@product.Color</th>
+                    <th>@product.Description</th>
+                    <th>@product.UseState</th>
+                    <th>@product.Price</th>
+                    <th><img src="/Images/ProductImages/@product.ImagePath" style="max-height :200px"/></th>
+                </tr>
+            }
+        </table>
+        <hr />
+        <tr>
+            <th>Teklif Verilecek Ürün</th>
+            <th>Teklif Tutarı</th>
+        </tr>
+        <tr>
+            <th>
+                <select class="form-control" id="ProductId" @bind="offer.ProductId" required>
+                    <option value="">Ürün Seçiniz</option>
+                    @foreach (var product in products)
+                    {
+                        <option value="@product.Id">@product.ProductName</option>
+                    }
+                </select>
+            </th>
+            <th>
+                <InputText id="OfferPrice" @bind-Value="price" default="@offer.OfferedPrice" placeholder="@offer.OfferedPrice" />
+            </th>
+            <th>
+                <div class="form-check form-check-inline">
+                    <InputRadioGroup class="form-check form-check-inline" id="offerRate" @bind-Value="offerRate">
+                        <InputRadio Value="25" class="form-check-input" type="radio" id="inlineRadio1" />
+                        <label class="form-check-label" for="inlineRadio1">%25</label>
+                        <InputRadio Value="50" class="form-check-input" type="radio" id="inlineRadio2" />
+                        <label class="form-check-label" for="inlineRadio2">%50</label>
+                        <InputRadio Value="75" class="form-check-input" type="radio" id="inlineRadio3" />
+                        <label class="form-check-label" for="inlineRadio3">%75</label>
+                    </InputRadioGroup>
+                </div>
+            </th>
+            <th><button type="submit">Teklif Ver</button></th>
+            <th>
+                <button type="button" @onclick="@Buy">Satın Al</button>
+            </th>
+        </tr>
+    }
+    <h3>@result</h3>
+</EditForm>
+@code {
+
+    protected List<ProductsViewModel> products = new List<ProductsViewModel>();
+    protected CreateOfferModel offer = new();
+    public string price;
+    public string result;
+    public int offerRate = 100;
+    private int counter;
+    protected override async Task OnInitializedAsync()
+    {
+        counter = 0;
+        result = "";
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Product");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            products = await response.Content.ReadFromJsonAsync<List<ProductsViewModel>>();
+        }
+        else
+        {
+            products.Clear();
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+    private async Task Submit()
+    {
+        if (Convert.ToInt32(price) == 0)
+            offer.OfferedPrice = (products.SingleOrDefault(p => p.Id == offer.ProductId).Price * offerRate) / 100;
+        else
+            offer.OfferedPrice = Convert.ToInt32(price);
+        offer.UserId = Login.userId;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:44301/api/Offer");
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(offer), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+    private async Task Buy()
+    {
+        offer.OfferedPrice = products.SingleOrDefault(p => p.Id == offer.ProductId).Price;
+        offer.UserId = Login.userId;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:44301/api/Offer");
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(offer), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        if (tokenResponse.IsSuccessStatusCode)
+        {
+            result = "Ürünü satın aldınız.";
+        }
+    }
+}

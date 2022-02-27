@@ -1,0 +1,300 @@
+﻿@page "/myaccount"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+<EditForm Model="@offer">
+    <DataAnnotationsValidator />
+    @if (myOfferProducts is not null)
+    {
+        i = 0;
+        <h3>Tekliflerim</h3>
+        <table class="table">
+            <tr>
+                <th>S/N</th>
+                <th>Ürün Adı</th>
+                <th>Kategori</th>
+                <th>Marka</th>
+                <th>Renk</th>
+                <th>Açıklama</th>
+                <th>Kullanım Durumu</th>
+                <th>Fiyat</th>
+                <th>Fotoğraf</th>
+                <th>Teklif Tutarı</th>
+                <th>Onay Durumu</th>
+            </tr>
+            @foreach (var product in myOfferProducts)
+            {
+                counter++;
+        <tr>
+            <th>@counter</th>
+            <th>@product.ProductName</th>
+            <th>@product.Category</th>
+            <th>@product.Brand</th>
+            <th>@product.Color</th>
+            <th>@product.Description</th>
+            <th>@product.UseState</th>
+            <th>@product.Price</th>
+            <th><img src="/Images/ProductImages/@product.ImagePath" style="max-height :200px"/></th>
+            <th>@myOffers[i].OfferedPrice</th>
+            @if (myOffers[i].IsAnswer)
+            {
+                @if (myOffers[i].IsAccept)
+                {
+                    <th>Onaylandı</th>
+                }
+                @if (!myOffers[i].IsAccept)
+                {
+                    <th>Reddedildi</th>
+                }
+            }
+            @if (!myOffers[i].IsAnswer)
+            {
+                <th>Beklemede</th>
+                <th><button type="button" @onclick="()=>DeleteOffer(myOffers[i].Id)">Teklifi Geriçek</button></th>
+            }
+
+        </tr>
+                i++;
+            }
+        </table>
+        i = 0;
+        counter = 0;
+    }
+    @if (myOfferProducts.Count()==0)
+    { <h3>Teklif verdiğiniz ürün bulunmuyor.</h3>}
+        <hr />
+        @if (myProducts is not null)
+        {
+            <h3>Gelen Teklifler</h3>
+            <table class="table">
+                <tr>
+                    <th>S/N</th>
+                    <th>Ürün Adı</th>
+                    <th>Kategori</th>
+                    <th>Marka</th>
+                    <th>Renk</th>
+                    <th>Açıklama</th>
+                    <th>Kullanım Durumu</th>
+                    <th>Fiyat</th>
+                    <th>Fotoğraf</th>
+                    <th>Teklif Tutarı</th>
+                    <th>Onay Durumu</th>
+                </tr>
+                @foreach (var product in myProducts)
+                {
+                    counter++;
+            <tr>
+                <th>@counter</th>
+                <th>@product.ProductName</th>
+                <th>@product.Category</th>
+                <th>@product.Brand</th>
+                <th>@product.Color</th>
+                <th>@product.Description</th>
+                <th>@product.UseState</th>
+                <th>@product.Price</th>
+                <th><img src="/Images/ProductImages/@product.ImagePath" style="max-height :200px"/></th>
+                <th>
+                    @foreach (var offerr in myProductOffers)
+                    {
+<tr>
+                            @if (offerr.ProductId == product.Id)
+                            {
+                                <th>@offerr.OfferedPrice</th>
+                                <th>
+                                    <button type="button" @onclick="()=>AcceptOffer(offerr.Id)">Onayla</button>
+                                    <button type="button" @onclick="()=>DeclineOffer(offerr.Id)">Reddet</button>
+                                </th>
+                            }
+                        </tr>
+                            }
+                        </th>
+                    </tr>
+                }
+            </table>
+        }
+        <h3>@result</h3>
+    </EditForm>
+@code {
+
+    protected List<OffersViewModel> myOffers = new List<OffersViewModel>();
+    protected List<OffersViewModel> myProductOffers = new List<OffersViewModel>();
+    protected List<ProductsViewModel> myOfferProducts = new List<ProductsViewModel>();
+    protected List<ProductsViewModel> myProducts = new List<ProductsViewModel>();
+    protected OffersViewModel offer = new();
+    protected UpdateOfferModel updateOfferModel = new();
+    public string price, result, offerPrice;
+    public int userId, productId;
+    private int counter,i=0;
+    protected override async Task OnInitializedAsync()
+    {
+        userId = Login.userId;
+        result = "";
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Offer/userid/" + userId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            myOffers = await response.Content.ReadFromJsonAsync<List<OffersViewModel>>();
+        }
+        else
+        {
+            myOffers.Clear();
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+        foreach (var offer in myOffers)
+        {
+            await GetProduct(offer.ProductId);
+        }
+
+        var request1 = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Product/userid/" + userId.ToString());
+
+        request1.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response1 = await client.SendAsync(request1);
+
+        if (response1.IsSuccessStatusCode)
+        {
+            myProducts = await response1.Content.ReadFromJsonAsync<List<ProductsViewModel>>();
+        }
+        else
+        {
+            var jsonResult = await response1.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+        foreach (var product in myProducts)
+        {
+            await GetOffer(product.Id);
+        }
+    }
+
+    private async Task AcceptOffer(int offerId)
+    {
+        updateOfferModel.IsAccept = true;
+        counter = 0;
+        i = 0;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://localhost:44301/api/Offer/" + offerId.ToString());
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(updateOfferModel), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+
+    private async Task DeclineOffer(int offerId)
+    {
+        updateOfferModel.IsAccept = false;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://localhost:44301/api/Offer/" + offerId.ToString());
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(updateOfferModel), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+    private async Task DeleteOffer(int offerId)
+    {
+        i = 0;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Delete, "https://localhost:44301/api/Offer/" + offerId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+
+    private async Task GetProduct(int productId)
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Product/" + productId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            myOfferProducts.Add(await response.Content.ReadFromJsonAsync<ProductsViewModel>());
+        }
+        else
+        {
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+    private async Task GetOffer(int productId)
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Offer/productid/" + productId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            myProductOffers.AddRange(await response.Content.ReadFromJsonAsync<List<OffersViewModel>>());
+        }
+        else
+        {
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+}
+

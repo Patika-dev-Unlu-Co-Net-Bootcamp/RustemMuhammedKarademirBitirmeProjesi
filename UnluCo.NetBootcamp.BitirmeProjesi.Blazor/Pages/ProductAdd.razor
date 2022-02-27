@@ -1,0 +1,168 @@
+﻿@page "/productadd"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.AspNetCore.Http
+@using Syncfusion.Blazor.Inputs
+
+@inject IWebHostEnvironment webHost
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+
+<EditForm Model="@product" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    @*<ValidationSummary />*@
+    <p>
+        <label for="ProductName">Ürün Adı:</label>
+        <InputText id="ProductName" @bind-Value="product.ProductName" />
+        <ValidationMessage For="() => product.ProductName" />
+    </p>
+    <p>
+        <label for="Category">
+            Kategori:
+            <select class="form-control" form-select-bg-size="3" id="Category" @bind="product.CategoryId" required>
+                <option value="">Kategori Seçiniz</option>
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Id">@category.CategoryName</option>
+                }
+            </select>
+        </label>
+        <ValidationMessage For="() => product.CategoryId" />
+    </p>
+    <p>
+        <label for="Brand">Marka:</label>
+        <select class="form-control" id="Brand" @bind="product.BrandId" required>
+            <option value="">Marka Seçiniz</option>
+            @foreach (var brand in brands)
+            {
+                <option value="@brand.Id">@brand.BrandName</option>
+            }
+        </select>
+        <ValidationMessage For="() => product.BrandId" />
+    </p>
+    <p>
+        <label for="Color">Renk:</label>
+        <select class="form-control" id="Color" @bind="product.ColorId" required>
+            <option value="">Renk Seçiniz</option>
+            @foreach (var color in colors)
+            {
+                <option value="@color.Id">@color.ColorName</option>
+            }
+        </select>
+        <ValidationMessage For="() => product.ColorId" />
+    </p>
+    <p>
+        <label for="UseState">Kullanım Durumu:</label>
+        <select class="form-control" id="UseState" @bind="product.UseStateId" required>
+            <option value="">Kullanım Durumunu Seçiniz</option>
+            @foreach (var useState in useStates)
+            {
+                <option value="@useState.Id">@useState.State</option>
+            }
+        </select>
+        <ValidationMessage For="() => product.UseStateId" />
+    </p>
+    <p>
+        <label for="Description">Açıklama:</label>
+        <textarea class="form-control" rows="3" id="Description" @bind="product.Description"></textarea>
+        <ValidationMessage For="() => product.Description" />
+    </p>
+    <p>
+        <label for="Price">Fiyat:</label>
+        <InputNumber id="Price" @bind-Value="product.Price" />
+        <ValidationMessage For="() => product.Price" />
+    </p>
+    <p>
+        <label for="IsOfferable">Teklif Durumu:</label>
+        <select class="form-control" id="IsOfferable" @bind="product.IsOfferable">
+            <option value="@true">Teklif Durumunu Seçiniz</option>
+            <option value="@true">Teklif Verilebilir</option>
+            <option value="@false">Teklif Verilemez</option>
+        </select>
+        <ValidationMessage For="() => product.IsOfferable" />
+    </p>
+    <p>
+
+        <label for="Image">Resim:</label>
+        @*<SfUploader ID="UploadFiles" AllowedExtensions=".png, .jpg, .jpeg" MaxFileSize=400000>
+
+        </SfUploader>*@
+        <InputFile OnChange="HandleFile" />
+        <ValidationMessage For="() => product.ImagePath" />
+    </p>
+    <button type="submit">Ürün Ekle</button>
+
+    <h3>@result</h3>
+</EditForm>
+
+@code {
+
+    public List<Brand> brands = new List<Brand>();
+    public List<Color> colors = new List<Color>();
+    protected List<Category> categories = new List<Category>();
+    public List<UseState> useStates = new List<UseState>();
+    public CreateProductModel product = new();
+    public string result;
+    protected override async Task OnInitializedAsync()
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Product/forproductadd");
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+        var res = await response.Content.ReadFromJsonAsync<ProductAddPropertyModel>();
+        brands = res.brands;
+        categories = res.categories;
+        colors = res.colors;
+        useStates = res.useStates;
+        product.UserId = Login.userId;
+
+    }
+    private async Task Submit()
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:44301/api/Product");
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(product), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+    private async Task HandleFile(InputFileChangeEventArgs e)
+    {
+        string[] AllowedExtensions = new string[] {"png", "jpg", "jpeg" };
+        var file = e.File;
+        var uzanti = AllowedExtensions.Contains(file.Name.Split(".")[1]);
+        if (e.File.Size < 400000 && !AllowedExtensions.Contains(file.Name.Split(".")[1]))
+            result = "Resim boyutu max 400kb olmalı.Resim formatı png, jpg, jpeg olmalı.";
+        else
+        {
+            var filePath = Path.Combine(webHost.WebRootPath, "Images", "ProductImages");
+            if (!Directory.Exists(filePath))
+                Directory.CreateDirectory(filePath);
+            var sourcePath = Path.Combine(filePath, file.Name);
+            using (var stream = new FileStream(sourcePath, FileMode.Create))
+            {
+                await file.OpenReadStream(maxAllowedSize: 400000).CopyToAsync(stream);
+            }
+            product.ImagePath = file.Name;
+        }
+    }
+}

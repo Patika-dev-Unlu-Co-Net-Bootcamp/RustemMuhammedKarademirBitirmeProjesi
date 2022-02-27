@@ -1,0 +1,54 @@
+﻿@page "/categoryupdate"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+
+<EditForm Model="@category" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    @*<ValidationSummary />*@
+    <p>
+        <label for="CategoryId">Kategori Id:</label>
+        <InputNumber id="CategoryId" @bind-Value="categoryId" required/>
+        @*<ValidationMessage For="() => category.CategoryName" />*@
+    </p>
+    <p>
+        <label for="CategoryName">Kategori Adı:</label>
+        <InputText id="CategoryName" @bind-Value="category.CategoryName" required/>
+        <ValidationMessage For="() => category.CategoryName" />
+    </p>
+
+    <button type="submit">Kategori Güncelle</button>
+
+    <h3>@result</h3>
+</EditForm>
+
+
+@code {
+
+    public UpdateCategoryModel category = new();
+    public int categoryId;
+    public string result;
+    
+    private async Task Submit()
+    {
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://localhost:44301/api/Category/"+ categoryId.ToString());
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(category), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var tokenResponse = await client.SendAsync(request);
+
+        var jsonResult = await tokenResponse.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+}

@@ -1,0 +1,156 @@
+﻿@page "/productupdate"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.AspNetCore.Http
+
+@inject IWebHostEnvironment webHost
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+@if (myProducts is not null)
+{
+    counter = 0;
+    <h3>Ürünlerim</h3>
+    <table class="table">
+        <tr>
+            <th>S/N</th>
+            <th>Ürün Adı</th>
+            <th>Kategori</th>
+            <th>Marka</th>
+            <th>Renk</th>
+            <th>Açıklama</th>
+            <th>Kullanım Durumu</th>
+            <th>Fiyat</th>
+            <th>Fotoğraf</th>
+        </tr>
+        @foreach (var product in myProducts)
+        {
+            counter++;
+            <tr>
+                <th>@counter</th>
+                <th>@product.ProductName</th>
+                <th>@product.Category</th>
+                <th>@product.Brand</th>
+                <th>@product.Color</th>
+                <th>@product.Description</th>
+                <th>@product.UseState</th>
+                <th>@product.Price</th>
+                <th><img src="/Images/ProductImages/@product.ImagePath" style="max-height :200px" /></th>
+            </tr>
+        }
+    </table>
+    <hr />
+    <tr>
+        <th>Güncellenecek Ürün</th>
+        <th>
+            <select class="form-control" id="ProductId" @bind="productId" required>
+                <option value="">Ürün Seçiniz</option>
+                @foreach (var product in myProducts)
+                {
+                    <option value="@product.Id">@product.ProductName</option>
+                }
+            </select>
+        </th>
+    </tr>
+}
+
+<EditForm Model="@product" OnValidSubmit="@Submit">
+    <DataAnnotationsValidator />
+    <p>
+        <label for="Price">Fiyat:</label>
+        <InputNumber id="Price" @bind-Value="product.Price" />
+        <ValidationMessage For="() => product.Price" />
+    </p>
+    <p>
+        <div class="form-check form-check-inline">
+            <InputRadioGroup class="form-check form-check-inline" id="offerRate" @bind-Value="product.IsImageDelete">
+                <InputRadio Value="@true" class="form-check-input" type="radio" id="inlineRadio1" />
+                <label class="form-check-label" for="inlineRadio1">Resmi Sil</label>
+                <InputRadio Value="@false" class="form-check-input" type="radio" id="inlineRadio2" />
+                <label class="form-check-label" for="inlineRadio2">Resmi Güncelle</label>
+            </InputRadioGroup>
+        </div>
+    </p>
+    <p>
+        <label for="Image">Resim:</label>
+        <InputFile OnChange="HandleFile" />
+        <ValidationMessage For="() => product.ImagePath" />
+    </p>
+
+    <button type="submit">Ürünü Güncelle</button>
+
+    <h3>@result</h3>
+</EditForm>
+@code {
+    protected List<ProductsViewModel> myProducts = new List<ProductsViewModel>();
+    public UpdateProductModel product = new();
+    public string result;
+    private int userId, counter,productId;
+    protected override async Task OnInitializedAsync()
+    {
+        userId = Login.userId;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Product/userid/" + userId.ToString());
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            myProducts = await response.Content.ReadFromJsonAsync<List<ProductsViewModel>>();
+        }
+        else
+        {
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+    private async Task Submit()
+    {
+        if (product.IsImageDelete)
+            product.ImagePath = myProducts.SingleOrDefault(p=>p.Id==productId).ImagePath;
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Put, "https://localhost:44301/api/Product/" + productId.ToString());
+
+        request.Content = new StringContent(JsonConvert.SerializeObject(product), Encoding.UTF8, "application/json");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+        result = jsonResult.Message;
+    }
+    private async Task HandleFile(InputFileChangeEventArgs e)
+    {
+        string[] AllowedExtensions = new string[] { "png", "jpg", "jpeg" };
+        var file = e.File;
+        var uzanti = AllowedExtensions.Contains(file.Name.Split(".")[1]);
+        if (e.File.Size < 400000 && !AllowedExtensions.Contains(file.Name.Split(".")[1]))
+            result = "Resim boyutu max 400kb olmalı.Resim formatı png, jpg, jpeg olmalı.";
+        else
+        {
+            var filePath = Path.Combine(webHost.WebRootPath, "Images", "ProductImages");
+            if (!Directory.Exists(filePath))
+                Directory.CreateDirectory(filePath);
+            var sourcePath = Path.Combine(filePath, file.Name);
+            using (var stream = new FileStream(sourcePath, FileMode.Create))
+            {
+                await file.OpenReadStream(maxAllowedSize: 400000).CopyToAsync(stream);
+            }
+            product.ImagePath = file.Name;
+        }
+    }
+}

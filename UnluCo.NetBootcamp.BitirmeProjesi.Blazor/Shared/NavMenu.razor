@@ -1,0 +1,87 @@
+﻿<div class="top-row pl-5 navbar navbar-dark">
+    <a class="navbar-brand" href="">UnluCo .Net Bootcamp</a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+<div class="overflow-auto">
+    <div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+        <ul class="nav flex-column">
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-home" aria-hidden="true"></span> Home
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="register">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Kayıt
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Giriş
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="myaccount">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Hesabım
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="offeradd">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Teklif Verme
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="productadd">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Ürün Ekleme
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="productupdate">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Ürün Güncelleme
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="" @onclick="()=>categoryMenu=!categoryMenu">
+                    <span class="oi oi-cart" aria-hidden="true"></span> Kategori İşlemleri
+                </NavLink>
+                @if (categoryMenu)
+                {
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="categories">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Kategoriler
+                    </NavLink>
+                </li>
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="categoryadd">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Kategori Ekle
+                    </NavLink>
+                </li>
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="categoryupdate">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Kategori Güncelle
+                    </NavLink>
+                </li>
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="getproductsbycategoryıd">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Kategoriye Göre Ürün Listeleme
+                    </NavLink>
+                </li>
+            }
+                </li>
+            </ul>
+    </div>
+</div>
+    @code {
+        private bool collapseNavMenu = true;
+        private bool categoryMenu;
+
+        private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+        private void ToggleNavMenu()
+        {
+            collapseNavMenu = !collapseNavMenu;
+
+        }
+    }

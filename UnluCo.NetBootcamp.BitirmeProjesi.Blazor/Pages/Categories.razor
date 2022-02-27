@@ -1,0 +1,62 @@
+﻿@page "/categories"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject IHttpClientFactory ClientFactory
+@inject ProtectedLocalStorage Storage
+
+
+@if(categories is not null)
+{   
+    <table class="table">
+        <tr>
+            <th>S/N</th>
+            <th>Kategoriler</th>
+
+        </tr>
+        <hr />
+    @foreach (var category in categories)
+    {   
+        <tr>
+            <th>@counter</th>
+            <th>@category.CategoryName</th>
+        </tr>
+        counter++;
+    }
+    </table>
+}
+<h3>@result</h3>    
+
+@code {
+
+    protected List<CategoriesViewModel> categories = new List<CategoriesViewModel>();
+    private int counter=1;
+    public string result;
+    protected override async Task OnInitializedAsync()
+    {
+        counter = 1;
+        result = "";
+        HttpClientHandler clientHandler = new HttpClientHandler();
+        clientHandler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; };
+        HttpClient client = new HttpClient(clientHandler);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://localhost:44301/api/Category");
+
+        var token = await Storage.GetAsync<string>("token");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await client.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            categories = await response.Content.ReadFromJsonAsync<List<CategoriesViewModel>>();
+        }
+        else
+        {
+            categories.Clear();
+            var jsonResult = await response.Content.ReadFromJsonAsync<ResultModel>();
+            result = jsonResult.Message;
+        }
+    }
+}
