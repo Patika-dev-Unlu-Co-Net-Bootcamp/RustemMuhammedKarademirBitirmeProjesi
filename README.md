@@ -1,5 +1,3 @@
-# BitirmeProjesi
-Patika.dev-ÜNLÜ &amp; Co .Net Bootcamp Bitirme Projesi
 <h1>Unlu.Co .Net Bootcamp Bitirme Projesi</h1>
 
 <p>Unlu.Co .Net Bootcamp bitirme projesi admin ve user rollerinde kullanıcılar bulunur.</p>
